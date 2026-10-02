@@ -1,4 +1,5 @@
 #include <iostream>
+#include <chrono>
 
 #include <opencv2/opencv.hpp>
 
@@ -26,7 +27,23 @@ int main()
 
     try
     {
+        // Se mide solo el tiempo del filtro Sobel,
+        // sin contar la lectura ni la escritura de la imagen
+        const auto start = std::chrono::high_resolution_clock::now();
+
         const cv::Mat edges = SobelFilter::apply(image);
+
+        const auto end = std::chrono::high_resolution_clock::now();
+
+        const auto duration =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                end - start
+            );
+
+        std::cout << "Tiempo de procesamiento: "
+                  << duration.count()
+                  << " ms"
+                  << std::endl;
 
         if (!cv::imwrite(outputPath, edges))
         {
