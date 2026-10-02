@@ -29,11 +29,14 @@ int main()
     {
         // Se mide solo el tiempo del filtro Sobel,
         // sin contar la lectura ni la escritura de la imagen
-        const auto start = std::chrono::high_resolution_clock::now();
+        const auto start =
+            std::chrono::high_resolution_clock::now();
 
-        const cv::Mat edges = SobelFilter::apply(image);
+        const cv::Mat edges =
+            SobelFilter::applyParallel(image);
 
-        const auto end = std::chrono::high_resolution_clock::now();
+        const auto end =
+            std::chrono::high_resolution_clock::now();
 
         const auto duration =
             std::chrono::duration_cast<std::chrono::milliseconds>(

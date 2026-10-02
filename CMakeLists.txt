@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(OpenCV REQUIRED)
+find_package(OpenMP REQUIRED)
 
 add_executable(sobel
     src/main.cpp
@@ -16,4 +17,7 @@ target_include_directories(sobel PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(sobel PRIVATE ${OpenCV_LIBS})
+target_link_libraries(sobel PRIVATE
+    ${OpenCV_LIBS}
+    OpenMP::OpenMP_CXX
+)
