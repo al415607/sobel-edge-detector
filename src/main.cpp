@@ -5,10 +5,25 @@
 
 #include "SobelFilter.hpp"
 
-int main()
+int main(int argc, char* argv[])
 {
-    const std::string inputPath = "images/test.jpg";
-    const std::string outputPath = "output/sobel.jpg";
+    if (argc < 3)
+    {
+        std::cerr << "Uso: sobel <imagen_entrada> <imagen_salida> [sequential|parallel]"
+                  << std::endl;
+        return 1;
+    }
+
+    const std::string inputPath = argv[1];
+    const std::string outputPath = argv[2];
+
+    // Si no se indica modo, se usa la version paralela por defecto
+    std::string mode = "parallel";
+
+    if (argc >= 4)
+    {
+        mode = argv[3];
+    }
 
     // OpenCV para leer la imagen
     cv::Mat image = cv::imread(inputPath, cv::IMREAD_COLOR);
@@ -25,15 +40,34 @@ int main()
               << image.cols << " x " << image.rows
               << std::endl;
 
+    std::cout << "Modo: "
+              << mode
+              << std::endl;
+
     try
     {
+        cv::Mat edges;
+
         // Se mide solo el tiempo del filtro Sobel,
         // sin contar la lectura ni la escritura de la imagen
         const auto start =
             std::chrono::high_resolution_clock::now();
 
-        const cv::Mat edges =
-            SobelFilter::applyParallel(image);
+        if (mode == "sequential")
+        {
+            edges = SobelFilter::applySequential(image);
+        }
+        else if (mode == "parallel")
+        {
+            edges = SobelFilter::applyParallel(image);
+        }
+        else
+        {
+            std::cerr << "Error: modo no valido. "
+                      << "Usa sequential o parallel."
+                      << std::endl;
+            return 1;
+        }
 
         const auto end =
             std::chrono::high_resolution_clock::now();

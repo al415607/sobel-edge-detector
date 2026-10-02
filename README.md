@@ -1,3 +1,37 @@
+## Uso
+
+El programa recibe una imagen de entrada, una ruta de salida y opcionalmente, el modo de ejecución.
+
+### Modo paralelo
+
+```bash
+sobel.exe <imagen_entrada> <imagen_salida> parallel
+```
+
+Ejemplo:
+
+```bash
+sobel.exe images/test.jpg output/sobel_parallel.jpg parallel
+```
+
+### Modo secuencial
+
+```bash
+sobel.exe <imagen_entrada> <imagen_salida> sequential
+```
+
+Ejemplo:
+
+```bash
+sobel.exe images/test.jpg output/sobel_sequential.jpg sequential
+```
+
+Si no se indica ningún modo, se utiliza la versión paralela por defecto:
+
+```bash
+sobel.exe images/test.jpg output/sobel.jpg
+```
+
 ## Rendimiento
 
 Pruebas realizadas con una imagen de 4288 x 2848 píxeles.
