@@ -31,3 +31,17 @@ output/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Android / Android Studio
+.gradle/
+.idea/
+local.properties
+.externalNativeBuild/
+.cxx/
+
+# Android generated packages
+*.apk
+*.aab
+
+# Android Studio captures
+captures/
