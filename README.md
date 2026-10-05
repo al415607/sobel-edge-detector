@@ -1,3 +1,9 @@
+# Sobel Edge Detector
+
+Implementación de un detector de bordes Sobel en C++.
+
+OpenCV se utiliza para la lectura y escritura de imágenes, mientras que el filtro Sobel se implementa manualmente. También se incluye una versión paralela con OpenMP y una interfaz Android mediante JNI.
+
 ## Uso
 
 El programa recibe una imagen de entrada, una ruta de salida y opcionalmente, el modo de ejecución.
@@ -30,6 +36,16 @@ Si no se indica ningún modo, se utiliza la versión paralela por defecto:
 
 ```bash
 sobel.exe images/test.jpg output/sobel.jpg
+```
+
+## Android
+
+El repositorio incluye una aplicación Android sencilla que permite seleccionar una imagen de la galería, aplicar el filtro Sobel mediante código nativo C++ usando JNI y mostrar el resultado en pantalla.
+
+La aplicación se encuentra en la carpeta:
+
+```text
+android/SobelEdgeDetector
 ```
 
 ## Rendimiento
