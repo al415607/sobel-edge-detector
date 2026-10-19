@@ -52,37 +52,93 @@ public class MainActivity extends AppCompatActivity {
                 imagePicker.launch("image/*")
         );
 
-        binding.applySobelButton.setOnClickListener(view -> {
-            if (selectedBitmap == null) {
-                return;
-            }
+        binding.applySobelButton.setOnClickListener(view ->
+                processSelectedImage()
+        );
+    }
 
-            // Se crea una copia modificable para procesarla desde C++
+    private void processSelectedImage() {
+        if (selectedBitmap == null) {
+            Toast.makeText(
+                    this,
+                    "Primero selecciona una imagen",
+                    Toast.LENGTH_SHORT
+            ).show();
+
+            return;
+        }
+
+        // Se evita iniciar varias operaciones al mismo tiempo
+        binding.applySobelButton.setEnabled(false);
+
+        try {
+            // Se crea una copia modificable en el formato esperado por C++
             Bitmap processedBitmap = selectedBitmap.copy(
                     Bitmap.Config.ARGB_8888,
                     true
             );
 
+            if (processedBitmap == null) {
+                Toast.makeText(
+                        this,
+                        "No se pudo preparar la imagen",
+                        Toast.LENGTH_SHORT
+                ).show();
+
+                return;
+            }
+
             applySobel(processedBitmap);
 
             binding.imageView.setImageBitmap(processedBitmap);
-        });
+
+        } catch (IllegalArgumentException exception) {
+            Toast.makeText(
+                    this,
+                    "Imagen no valida: " + exception.getMessage(),
+                    Toast.LENGTH_SHORT
+            ).show();
+
+        } catch (RuntimeException exception) {
+            Toast.makeText(
+                    this,
+                    "Error al procesar la imagen: " + exception.getMessage(),
+                    Toast.LENGTH_SHORT
+            ).show();
+
+        } finally {
+            binding.applySobelButton.setEnabled(true);
+        }
     }
 
     private void loadImage(Uri uri) {
         try (InputStream inputStream =
                      getContentResolver().openInputStream(uri)) {
 
-            selectedBitmap = BitmapFactory.decodeStream(inputStream);
+            if (inputStream == null) {
+                Toast.makeText(
+                        this,
+                        "No se pudo abrir la imagen",
+                        Toast.LENGTH_SHORT
+                ).show();
 
-            if (selectedBitmap == null) {
+                return;
+            }
+
+            Bitmap bitmap =
+                    BitmapFactory.decodeStream(inputStream);
+
+            if (bitmap == null) {
                 Toast.makeText(
                         this,
                         "No se pudo cargar la imagen",
                         Toast.LENGTH_SHORT
                 ).show();
+
                 return;
             }
+
+            selectedBitmap = bitmap;
 
             binding.imageView.setImageBitmap(selectedBitmap);
             binding.applySobelButton.setEnabled(true);

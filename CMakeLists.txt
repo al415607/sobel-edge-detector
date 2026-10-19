@@ -11,6 +11,7 @@ find_package(OpenMP REQUIRED)
 add_executable(sobel
     src/main.cpp
     src/SobelFilter.cpp
+    src/SobelCore.cpp
 )
 
 target_include_directories(sobel PRIVATE

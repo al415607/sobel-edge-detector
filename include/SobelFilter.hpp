@@ -1,10 +1,19 @@
 #pragma once
 
-#include <opencv2/core.hpp>
+#include "Filter.hpp"
 
-class SobelFilter
+class SobelFilter : public Filter
 {
 public:
-    static cv::Mat applySequential(const cv::Mat& input);
-    static cv::Mat applyParallel(const cv::Mat& input);
+    FilterResult apply(
+        const cv::Mat& input,
+        ExecutionMode mode
+    ) const override;
+
+private:
+    static void processRow(
+        const cv::Mat& gray,
+        cv::Mat& edges,
+        int y
+    );
 };

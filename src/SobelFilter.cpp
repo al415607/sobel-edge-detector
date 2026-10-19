@@ -1,35 +1,77 @@
 #include "SobelFilter.hpp"
+#include "SobelCore.hpp"
 
-#include <algorithm>
-#include <cmath>
 #include <stdexcept>
+#include <chrono>
 
 #include <opencv2/imgproc.hpp>
 
-cv::Mat SobelFilter::applySequential(const cv::Mat& input)
+namespace
+{
+    constexpr int SOBEL_KERNEL_SIZE = 3;
+    constexpr int SOBEL_KERNEL_RADIUS =
+        SOBEL_KERNEL_SIZE / 2;
+}
+
+FilterResult SobelFilter::apply(
+    const cv::Mat& input,
+    ExecutionMode mode
+) const
 {
     if (input.empty())
     {
-        throw std::invalid_argument("La imagen de entrada esta vacia");
+        throw std::invalid_argument(
+            "La imagen de entrada esta vacia"
+        );
+    }
+
+    if (input.depth() != CV_8U)
+    {
+        throw std::invalid_argument(
+            "Solo se admiten imagenes de 8 bits por canal"
+        );
+    }
+
+    if (
+    input.rows < SOBEL_KERNEL_SIZE ||
+    input.cols < SOBEL_KERNEL_SIZE
+    )
+    {
+        throw std::invalid_argument(
+            "La imagen es demasiado pequena para el kernel Sobel"
+        );
     }
 
     cv::Mat gray;
 
     // El filtro Sobel trabaja sobre intensidades, por eso se convierten
     // las imagenes en color a escala de grises antes de procesarlas
-    if (input.channels() == 3)
+    switch (input.channels())
     {
-        cv::cvtColor(input, gray, cv::COLOR_BGR2GRAY);
-    }
-    else if (input.channels() == 1)
-    {
-        gray = input;
-    }
-    else
-    {
-        throw std::invalid_argument(
-            "Numero de canales de imagen no soportado"
-        );
+        case 1:
+            gray = input;
+            break;
+
+        case 3:
+            cv::cvtColor(
+                input,
+                gray,
+                cv::COLOR_BGR2GRAY
+            );
+            break;
+
+        case 4:
+            cv::cvtColor(
+                input,
+                gray,
+                cv::COLOR_BGRA2GRAY
+            );
+            break;
+
+        default:
+            throw std::invalid_argument(
+                "Numero de canales de imagen no soportado"
+            );
     }
 
     // La salida tiene el mismo tamaño que la entrada
@@ -39,141 +81,113 @@ cv::Mat SobelFilter::applySequential(const cv::Mat& input)
         CV_8UC1
     );
 
-    for (int y = 1; y < gray.rows - 1; ++y)
+    const auto start =
+        std::chrono::high_resolution_clock::now();
+
+    switch (mode)
     {
-        // Se accede directamente a las filas necesarias para evitar llamadas
-        // repetidas a at() en cada pixel
-        const unsigned char* previousRow = gray.ptr<unsigned char>(y - 1);
-        const unsigned char* currentRow = gray.ptr<unsigned char>(y);
-        const unsigned char* nextRow = gray.ptr<unsigned char>(y + 1);
-
-        unsigned char* outputRow = edges.ptr<unsigned char>(y);
-
-        for (int x = 1; x < gray.cols - 1; ++x)
+        case ExecutionMode::Sequential:
         {
-            const int gx =
-                -previousRow[x - 1]
-                + previousRow[x + 1]
-                - 2 * currentRow[x - 1]
-                + 2 * currentRow[x + 1]
-                - nextRow[x - 1]
-                + nextRow[x + 1];
+            for (
+                int y = SOBEL_KERNEL_RADIUS;
+                y < gray.rows - SOBEL_KERNEL_RADIUS;
+                ++y
+            )
+            {
+                processRow(gray, edges, y);
+            }
 
-            const int gy =
-                -previousRow[x - 1]
-                - 2 * previousRow[x]
-                - previousRow[x + 1]
-                + nextRow[x - 1]
-                + 2 * nextRow[x]
-                + nextRow[x + 1];
+            break;
+        }
 
-            const double magnitude =
-                std::sqrt(
-                    static_cast<double>(gx * gx + gy * gy)
-                );
+        case ExecutionMode::Parallel:
+        {
+            // Cada iteracion procesa una fila distinta de la imagen de salida
+            // La imagen de entrada solo se lee por lo que las filas se pueden
+            // repartir entre varios hilos de forma independiente
+            #pragma omp parallel for
+            for (
+                int y = SOBEL_KERNEL_RADIUS;
+                y < gray.rows - SOBEL_KERNEL_RADIUS;
+                ++y
+            )
+            {
+                processRow(gray, edges, y);
+            }
 
-            outputRow[x] =
-                static_cast<unsigned char>(
-                    std::min(magnitude, 255.0)
-                );
+            break;
         }
     }
 
+    const auto end =
+        std::chrono::high_resolution_clock::now();
+
+    const auto processingTime =
+        std::chrono::duration_cast<std::chrono::microseconds>(
+            end - start
+        );
+
     // Se mantiene el mismo numero de canales que la imagen de entrada
-    if (input.channels() == 3)
+    switch (input.channels())
     {
-        cv::Mat colorEdges;
-        cv::cvtColor(edges, colorEdges, cv::COLOR_GRAY2BGR);
-        return colorEdges;
+        case 1:
+            return {edges, processingTime};
+
+        case 3:
+        {
+            cv::Mat colorEdges;
+
+            cv::cvtColor(
+                edges,
+                colorEdges,
+                cv::COLOR_GRAY2BGR
+            );
+
+            return {colorEdges, processingTime};
+        }
+
+        case 4:
+        {
+            cv::Mat colorEdges;
+
+            cv::cvtColor(
+                edges,
+                colorEdges,
+                cv::COLOR_GRAY2BGRA
+            );
+
+            return {colorEdges, processingTime};
+        }
     }
 
-    return edges;
+    throw std::runtime_error(
+        "Error inesperado al generar la imagen de salida"
+    );
 }
 
-cv::Mat SobelFilter::applyParallel(const cv::Mat& input)
+void SobelFilter::processRow(
+    const cv::Mat& gray,
+    cv::Mat& edges,
+    int y
+)
 {
-    if (input.empty())
-    {
-        throw std::invalid_argument("La imagen de entrada esta vacia");
-    }
+    const std::uint8_t* previousRow =
+        gray.ptr<std::uint8_t>(y - 1);
 
-    cv::Mat gray;
+    const std::uint8_t* currentRow =
+        gray.ptr<std::uint8_t>(y);
 
-    if (input.channels() == 3)
-    {
-        cv::cvtColor(input, gray, cv::COLOR_BGR2GRAY);
-    }
-    else if (input.channels() == 1)
-    {
-        gray = input;
-    }
-    else
-    {
-        throw std::invalid_argument(
-            "Numero de canales de imagen no soportado"
-        );
-    }
+    const std::uint8_t* nextRow =
+        gray.ptr<std::uint8_t>(y + 1);
 
-    cv::Mat edges = cv::Mat::zeros(
-        gray.size(),
-        CV_8UC1
+    std::uint8_t* outputRow =
+        edges.ptr<std::uint8_t>(y);
+
+    SobelCore::processRow(
+        previousRow,
+        currentRow,
+        nextRow,
+        outputRow,
+        gray.cols
     );
-
-    // Cada iteracion procesa una fila distinta de la imagen de salida
-    // La imagen de entrada solo se lee por lo que las filas se pueden
-    // repartir entre varios hilos de forma independiente
-    #pragma omp parallel for
-    for (int y = 1; y < gray.rows - 1; ++y)
-    {
-        const unsigned char* previousRow =
-            gray.ptr<unsigned char>(y - 1);
-
-        const unsigned char* currentRow =
-            gray.ptr<unsigned char>(y);
-
-        const unsigned char* nextRow =
-            gray.ptr<unsigned char>(y + 1);
-
-        unsigned char* outputRow =
-            edges.ptr<unsigned char>(y);
-
-        for (int x = 1; x < gray.cols - 1; ++x)
-        {
-            const int gx =
-                -previousRow[x - 1]
-                + previousRow[x + 1]
-                - 2 * currentRow[x - 1]
-                + 2 * currentRow[x + 1]
-                - nextRow[x - 1]
-                + nextRow[x + 1];
-
-            const int gy =
-                -previousRow[x - 1]
-                - 2 * previousRow[x]
-                - previousRow[x + 1]
-                + nextRow[x - 1]
-                + 2 * nextRow[x]
-                + nextRow[x + 1];
-
-            const double magnitude =
-                std::sqrt(
-                    static_cast<double>(gx * gx + gy * gy)
-                );
-
-            outputRow[x] =
-                static_cast<unsigned char>(
-                    std::min(magnitude, 255.0)
-                );
-        }
-    }
-
-    // Se mantiene el mismo numero de canales que la imagen de entrada
-    if (input.channels() == 3)
-    {
-        cv::Mat colorEdges;
-        cv::cvtColor(edges, colorEdges, cv::COLOR_GRAY2BGR);
-        return colorEdges;
-    }
-
-    return edges;
 }
